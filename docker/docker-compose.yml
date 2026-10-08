@@ -1,0 +1,24 @@
+services:
+  oracle-local:
+    image: ${LOCAL_IMAGE:?run through make / scripts/local.sh}
+    container_name: ${LOCAL_HOST:-oracle-local}
+    environment:
+      ORACLE_PASSWORD: ${LOCAL_SYS_PASSWORD:?set LOCAL_SYS_PASSWORD in .env}
+    ports:
+      # localhost only: this database holds a copy of prod data
+      - "127.0.0.1:${LOCAL_PORT:-1530}:1521"
+    volumes:
+      - oracle-local-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
+networks:
+  default:
+    name: ${DOCKER_NETWORK:-plsql}
+    external: true
+
+volumes:
+  oracle-local-data:

@@ -1,0 +1,45 @@
+name: self-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit:
+    if: github.repository == 'mnhat2206/plsql-agent'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make lint
+      - run: make test
+
+  integration:
+    if: github.repository == 'mnhat2206/plsql-agent'
+    name: integration (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: prod 23 -> local 23
+            fakeprod_image: gvenzl/oracle-free:23-slim-faststart
+            fakeprod_pdb: FREEPDB1
+            oracle_version: '23'
+          - name: prod 21 -> local 23
+            fakeprod_image: gvenzl/oracle-xe:21-slim-faststart
+            fakeprod_pdb: XEPDB1
+            oracle_version: '23'
+          - name: prod 21 -> local 21
+            fakeprod_image: gvenzl/oracle-xe:21-slim-faststart
+            fakeprod_pdb: XEPDB1
+            oracle_version: '21'
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test-integration
+        env:
+          FAKEPROD_IMAGE: ${{ matrix.fakeprod_image }}
+          FAKEPROD_PDB: ${{ matrix.fakeprod_pdb }}
+          ORACLE_VERSION: ${{ matrix.oracle_version }}

@@ -1,0 +1,54 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/packages/**']
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Deploy packages changed between this commit and main
+        required: true
+
+# GitHub keeps only the newest pending run of a group and cancels the others.
+# That is safe because each run deploys everything since the last successful
+# deploy (tag plsql-deployed), not just its own push.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # move the plsql-deployed tag
+
+jobs:
+  deploy:
+    # Opt in after the self-hosted runner and secrets are set up (see README).
+    if: vars.PLSQL_DEPLOY_ENABLED == 'true'
+    runs-on: [self-hosted, plsql-deploy]
+    timeout-minutes: 30
+    env:
+      PROD_CONNECT: ${{ secrets.PROD_CONNECT }}
+      PROD_TNS: ${{ secrets.PROD_TNS }}
+      PROD_USER: ${{ secrets.PROD_USER }}
+      PROD_PASSWORD: ${{ secrets.PROD_PASSWORD }}
+      TNSNAMES_ORA: ${{ secrets.TNSNAMES_ORA }}
+      APP_SCHEMA: ${{ vars.APP_SCHEMA }}
+      ORACLE_VERSION: ${{ vars.ORACLE_VERSION || '23' }}
+      DISPATCH_BASE: ${{ inputs.base }}
+      PUSH_BEFORE: ${{ github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Write tnsnames.ora
+        if: env.TNSNAMES_ORA != ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/tns"
+          printf '%s\n' "$TNSNAMES_ORA" > "$RUNNER_TEMP/tns/tnsnames.ora"
+          echo "TNS_ADMIN=$RUNNER_TEMP/tns" >> "$GITHUB_ENV"
+      - name: Deploy packages changed since the last successful deploy
+        run: make deploy BASE="$(scripts/ci_base.sh "$DISPATCH_BASE" "$PUSH_BEFORE")" HEAD="$GITHUB_SHA"
+      - name: Mark this commit as deployed
+        run: |
+          git tag -f plsql-deployed "$GITHUB_SHA"
+          git push -f origin refs/tags/plsql-deployed

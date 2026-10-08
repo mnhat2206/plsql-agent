@@ -1,0 +1,23 @@
+name: pr-check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      APP_SCHEMA: ${{ vars.APP_SCHEMA || 'APP' }}
+      ORACLE_VERSION: ${{ vars.ORACLE_VERSION || '23' }}
+      LOCAL_SYS_PASSWORD: ci_Passw0rd
+      LOCAL_IMAGE_SUFFIX: -faststart
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start Oracle
+        run: make up
+      - name: Create the schema from ci/schema
+        run: make ci-schema
+      - name: Compile all packages
+        run: make compile

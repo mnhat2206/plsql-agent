@@ -1,0 +1,24 @@
+# Integration tests only: a throwaway "prod" with schema APP and sample data.
+services:
+  oracle-fakeprod:
+    image: ${FAKEPROD_IMAGE:-gvenzl/oracle-free:23-slim-faststart}
+    container_name: ${FAKEPROD_HOST:-plsqltest-fakeprod}
+    environment:
+      ORACLE_PASSWORD: fakeprod_sys
+      APP_USER: APP
+      APP_USER_PASSWORD: app
+      FAKEPROD_PDB: ${FAKEPROD_PDB:-FREEPDB1}
+    ports:
+      - "127.0.0.1:${FAKEPROD_PORT:-1541}:1521"
+    volumes:
+      - ./fakeprod-init:/container-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
+networks:
+  default:
+    name: ${DOCKER_NETWORK:?}
+    external: true
